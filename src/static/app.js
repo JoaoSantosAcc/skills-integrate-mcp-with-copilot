@@ -2,7 +2,82 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
+  const signupContainer = document.getElementById("signup-container");
   const messageDiv = document.getElementById("message");
+  const authButton = document.getElementById("auth-button");
+  const authButtonLabel = document.getElementById("auth-button-label");
+  const loginDialog = document.getElementById("login-dialog");
+  const loginForm = document.getElementById("login-form");
+  const loginMessage = document.getElementById("login-message");
+  let authorizationHeader = null;
+  let isTeacher = false;
+
+  function updateAuthControls() {
+    authButtonLabel.textContent = isTeacher ? "Log out" : "Teacher login";
+    authButton.setAttribute(
+      "aria-label",
+      isTeacher ? "Log out of teacher mode" : "Log in as a teacher"
+    );
+    signupContainer.classList.toggle("hidden", !isTeacher);
+  }
+
+  function makeAuthorizationHeader(username, password) {
+    const bytes = new TextEncoder().encode(`${username}:${password}`);
+    const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+    return `Basic ${btoa(binary)}`;
+  }
+
+  authButton.addEventListener("click", () => {
+    if (isTeacher) {
+      authorizationHeader = null;
+      isTeacher = false;
+      updateAuthControls();
+      fetchActivities();
+      return;
+    }
+
+    loginMessage.textContent = "";
+    loginMessage.classList.add("hidden");
+    loginDialog.showModal();
+  });
+
+  document.getElementById("cancel-login").addEventListener("click", () => {
+    loginDialog.close();
+  });
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(loginForm);
+    const candidateAuthorization = makeAuthorizationHeader(
+      formData.get("username"),
+      formData.get("password")
+    );
+
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { Authorization: candidateAuthorization },
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        loginMessage.textContent = result.detail || "Unable to sign in.";
+        loginMessage.className = "error";
+        return;
+      }
+
+      authorizationHeader = candidateAuthorization;
+      isTeacher = true;
+      loginForm.reset();
+      updateAuthControls();
+      loginDialog.close();
+      fetchActivities();
+    } catch (error) {
+      loginMessage.textContent = "Failed to sign in. Please try again.";
+      loginMessage.className = "error";
+      console.error("Error signing in:", error);
+    }
+  });
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -12,6 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -29,8 +105,14 @@ document.addEventListener("DOMContentLoaded", () => {
               <ul class="participants-list">
                 ${details.participants
                   .map(
-                    (email) =>
-                      `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button></li>`
+                    (email) => `<li>
+                      <span class="participant-email">${email}</span>
+                      ${
+                        isTeacher
+                          ? `<button class="delete-btn" data-activity="${name}" data-email="${email}" aria-label="Unregister ${email} from ${name}">❌</button>`
+                          : ""
+                      }
+                    </li>`
                   )
                   .join("")}
               </ul>
@@ -80,6 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/unregister?email=${encodeURIComponent(email)}`,
         {
           method: "DELETE",
+          headers: { Authorization: authorizationHeader },
         }
       );
 
@@ -124,6 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/signup?email=${encodeURIComponent(email)}`,
         {
           method: "POST",
+          headers: { Authorization: authorizationHeader },
         }
       );
 
@@ -156,5 +240,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Initialize app
+  updateAuthControls();
   fetchActivities();
 });
