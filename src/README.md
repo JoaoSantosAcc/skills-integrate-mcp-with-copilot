@@ -5,32 +5,37 @@ A super simple FastAPI application that allows students to view and sign up for 
 ## Features
 
 - View all available extracurricular activities
-- Sign up for activities
+- Sign up for activities in teacher mode
+- Unregister students in teacher mode
 
 ## Getting Started
 
-1. Install the dependencies:
+1. Configure the teacher credentials in the environment where the API will run:
 
    ```
-   pip install fastapi uvicorn
+   export TEACHER_USERNAME="teacher"
+   export TEACHER_PASSWORD="use-a-unique-secret"
    ```
 
-2. Run the application:
+   Do not commit credentials to the repository. Set these values through your deployment's secret-management system in production.
 
-   ```
-   python app.py
-   ```
+2. From the repository root, install the dependencies with `pip install -r requirements.txt` and start the API with `uvicorn app:app --app-dir src --reload`.
 
 3. Open your browser and go to:
+   - Activities page: http://localhost:8000
    - API documentation: http://localhost:8000/docs
    - Alternative documentation: http://localhost:8000/redoc
 
 ## API Endpoints
 
-| Method | Endpoint                                                          | Description                                                         |
-| ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------- |
-| GET    | `/activities`                                                     | Get all activities with their details and current participant count |
-| POST   | `/activities/{activity_name}/signup?email=student@mergington.edu` | Sign up for an activity                                             |
+| Method | Endpoint                                                          | Description                                                        |
+| ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| GET    | `/activities`                                                     | Publicly view activities and their current participants            |
+| POST   | `/auth/login`                                                     | Validate teacher credentials using HTTP Basic authentication       |
+| POST   | `/activities/{activity_name}/signup?email=student@mergington.edu` | Teacher-only: sign up a student                                     |
+| DELETE | `/activities/{activity_name}/unregister?email=student@mergington.edu` | Teacher-only: unregister a student                                |
+
+The browser sends teacher credentials only for the current page session; signing out clears them. HTTP Basic authentication must be used over HTTPS outside local development.
 
 ## Data Model
 
